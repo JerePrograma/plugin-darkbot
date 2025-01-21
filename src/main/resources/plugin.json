@@ -1,0 +1,15 @@
+{
+  "name": "PvPTest",
+  "author": "x",
+  "version": "0.0.1",
+  "minVersion": "1.128.3",
+  "supportedVersion": "1.128.3",
+  "basePackage": "lol.same.pvptest",
+  "features": [
+    "lol.same.pvptest.conditionalitems.ConditionalItems",
+    "lol.same.pvptest.pvp.PvPModule",
+    "lol.same.pvptest.syncer.Syncer",
+    "lol.same.pvptest.PlayerMapTracker",
+    "lol.same.pvptest.PlayerEquipment"
+  ]
+}

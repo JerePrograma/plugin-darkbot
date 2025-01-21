@@ -1,0 +1,11 @@
+package lol.same.pvptest.pvp.config;
+
+public enum TargetSelectMode {
+    HELP_ATTACK_PLAYERS,
+    HELP_ATTACK_NPCS,
+    DEFEND_LEADER_FROM_PLAYERS,
+    DEFEND_GROUP_FROM_PLAYERS,
+    DEFEND_SELF_FROM_PLAYERS,
+    DEFEND_SELF_FROM_NPCS,
+    ATTACK_NPCS;
+}
