@@ -4,6 +4,8 @@ import eu.darkbot.api.config.annotations.Configuration;
 import eu.darkbot.api.config.annotations.Dropdown;
 import eu.darkbot.api.config.annotations.Option;
 import eu.darkbot.api.config.annotations.Number;
+import eu.darkbot.api.config.types.Condition;
+import lol.same.pvptest.conditionalitems.PercentHealthLessThanCondition;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -70,4 +72,39 @@ public class PvPConfig {
 
     @Option("anti_push")
     public AntiPush antiPush = new AntiPush();
+
+    // Configuración para ISH-01
+    @Option("general.ish")
+    public String ishItem = "ISH-01";
+
+    @Option("general.ish.desc")
+    public String ishDescription = "Condiciones ISH-01";
+
+    // Opción para habilitar ISH
+    @Option("general.enable_ish")
+    public boolean enableIsh = false;
+
+    // Condición para usar ISH-01
+    @Option("general.ish_condition")
+    public Condition ishCondition = new PercentHealthLessThanCondition(50); // Usar ISH si la salud < 50%
+
+    // Configuración para PEM-01
+    @Option("general.pem")
+    public String pemItem = "PEM-01";
+
+    @Option("general.pem.desc")
+    public String pemDescription = "Condiciones PEM-01";
+
+    // Opción para habilitar PEM
+    @Option("general.enable_pem")
+    public boolean enablePem = false;
+
+    // Condición para usar PEM-01
+    @Option("general.pem_condition")
+    public Condition pemCondition = new PercentHealthLessThanCondition(50); // Usar PEM si la salud < 50%
+
+    // Tiempo de espera entre usos (en segundos)
+    @Option("general.item_cooldown_seconds")
+    @Number(min = 0, max = 60, step = 1)
+    public int itemCooldownSeconds = 4; // 4 segundos de espera
 }

@@ -20,6 +20,7 @@ import lol.same.pvptest.PlayerNames;
 import lol.same.pvptest.syncer.SyncerConfig;
 import lol.same.pvptest.syncer.SyncerConfigProvider;
 import lol.same.pvptest.utils.LogIfChanged;
+import lol.same.pvptest.conditionalitems.ConditionsManagement;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -27,7 +28,7 @@ import java.util.*;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-@Feature(name="PvP", description = "Pelea contra otros jugadores")
+@Feature(name = "PvP", description = "Pelea contra otros jugadores")
 public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigProvider {
     private PvPConfig config;
 
@@ -52,6 +53,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
     private final FollowLeader followLeader;
     private final TargetSelect targetSelect;
 
+    // Instancia de ConditionsManagement
+    private final ConditionsManagement conditionsManagement;
+
     private enum Status {
         IDLE,
         SAFETY_ESCAPING,
@@ -59,7 +63,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         APPROACHING_LEADER,
         FIGHTING;
     }
-    @NotNull Status status = Status.IDLE;
+
+    @NotNull
+    private Status status = Status.IDLE;
 
     public PvPModule(PluginAPI plugin) {
         this.hero = plugin.requireAPI(HeroAPI.class);
@@ -77,11 +83,14 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         this.collectResourcesModule = new CollectorModule(plugin);
         this.followLeader = new FollowLeader(plugin);
         this.targetSelect = new TargetSelect(plugin);
+
+        // Inicializar ConditionsManagement
+        this.conditionsManagement = new ConditionsManagement(plugin.requireAPI(PluginAPI.class), heroItems);
     }
 
     @Override
     public String getStatus() {
-        var msg = "Error";
+        String msg = "Error";
         switch (status) {
             case IDLE:
                 msg = (config.collectResourcesOnIdle)
@@ -139,18 +148,42 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         syncerConfig.syncEnergyLeech = config.copyEnergyLeech;
         return syncerConfig;
     }
-    
+
     @Override
     public void onTickModule() {
+        updateStatus();
+        if (status == Status.SAFETY_ESCAPING) {
+            logAndExit("Status");
+            return;
+        }
+
+        handleTargetSelection();
+
+        handleCombat();
+
+        handleIdleState();
+    }
+
+    /**
+     * Actualiza el estado actual del módulo.
+     */
+    private void updateStatus() {
         status = Status.IDLE;
-        if (hero.isAttacking())
+        if (hero.isAttacking()) {
             lastAttackTime = System.nanoTime();
+        }
         followLeader.determineLeader();
+    }
+
+    /**
+     * Maneja la selección y seguimiento de objetivos.
+     */
+    private void handleTargetSelection() {
         var leader = followLeader.getLeader().orElse(null);
 
+        // Verificar seguridad
         if (!config.ignoreSafety && !safety.tick()) {
             status = Status.SAFETY_ESCAPING;
-            LogIfChanged.log("Status", getStatus());
             return;
         }
 
@@ -174,7 +207,12 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
                 lastAttackTime = System.nanoTime();
             }
         }
+    }
 
+    /**
+     * Maneja la lógica de combate si hay un objetivo presente.
+     */
+    private void handleCombat() {
         var target = targetSelect.getTarget();
 
         attack.setTarget(target.orElse(null));
@@ -186,46 +224,114 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
             attack.tryLockAndAttack();
             LogIfChanged.log("Tick pvp", "Atacando");
         } else {
-            if (!hero.isInvisible() &&
-                    followLeader.getLeaderGroupMember().map(GroupMember::isCloaked).orElse(false)) {
-                System.out.println("Camuflándose porque el líder esta camuflado");
-                heroItems.useItem(SelectableItem.Cpu.CL04K);
-            }
-
-            autoCloakLogic();
-            rechargeShields();
-            if (status == Status.IDLE) {
-                if ((config.rechargeShields && isConfigAttackFull && isConfigRunFull)
-                        || (!config.rechargeShields && config.changeConfig)) {
-                    hero.setMode(ShipMode.of(configRoam.getValue().getConfiguration(), hero.getFormation()));
-                }
-                if (config.collectResourcesOnIdle && collectResourcesModule.isNotWaiting()) {
-                    collectResourcesModule.findBox();
-                    if (leader == null || (collectResourcesModule.currentBox != null &&
-                            collectResourcesModule.currentBox.distanceTo(leader) < config.distanceFromLeader)) {
-                        LogIfChanged.log("Tick pvp", "Recolectando caja " + collectResourcesModule.currentBox);
-                        collectResourcesModule.onTickModule();
-                    } else {
-                        LogIfChanged.log("Tick pvp", "Nada que recolectar");
-                    }
-                } else if (!config.collectResourcesOnIdle && leader == null &&
-                        (!movement.isMoving() || movement.isOutOfMap())) {
-                    LogIfChanged.log("Tick pvp", "Movimiento aleatorio");
-                    movement.moveRandom();
-                } else {
-                    LogIfChanged.log("Tick pvp", "Detenido");
-                }
-                if (leader != null &&
-                        movement.getDestination().distanceTo(leader) > config.distanceFromLeader) {
-                    System.out.println("Cancelando movimiento lejos del líder");
-                    movement.stop(true);
-                }
-            } else {
-                LogIfChanged.log("Tick pvp", "No hacer nada porque el status es " + status);
-            }
+            handleNoTarget();
         }
     }
 
+    /**
+     * Maneja la lógica cuando no hay un objetivo presente.
+     */
+    private void handleNoTarget() {
+        var leader = followLeader.getLeader().orElse(null);
+
+        if (!hero.isInvisible() &&
+                followLeader.getLeaderGroupMember().map(GroupMember::isCloaked).orElse(false)) {
+            System.out.println("Camuflándose porque el líder está camuflado");
+            heroItems.useItem(SelectableItem.Cpu.CL04K);
+        }
+
+        // Implementar uso de ISH-01
+        if (config.enableIsh) { // Verificar si ISH está habilitado
+            boolean ishUsed = conditionsManagement.useKeyWithConditions(config.ishCondition, SelectableItem.Special.ISH_01);
+            if (ishUsed) {
+                LogIfChanged.log("Munición", "ISH-01 usado correctamente.");
+            } else {
+                LogIfChanged.log("Munición", "No se pudo usar ISH-01.");
+            }
+        }
+
+        autoCloakLogic();
+        rechargeShields();
+
+        if (status == Status.IDLE) {
+            handleIdleState();
+        }
+    }
+
+    /**
+     * Maneja el estado IDLE del módulo.
+     */
+    private void handleIdleState() {
+        if ((config.rechargeShields && isConfigAttackFull && isConfigRunFull)
+                || (!config.rechargeShields && config.changeConfig)) {
+            hero.setMode(ShipMode.of(configRoam.getValue().getConfiguration(), hero.getFormation()));
+        }
+
+        if (config.collectResourcesOnIdle && collectResourcesModule.isNotWaiting()) {
+            collectResourcesModule.findBox();
+            var leader = followLeader.getLeader().orElse(null);
+            if (leader == null || (collectResourcesModule.currentBox != null &&
+                    collectResourcesModule.currentBox.distanceTo(leader) < config.distanceFromLeader)) {
+                LogIfChanged.log("Tick pvp", "Recolectando caja " + collectResourcesModule.currentBox);
+                collectResourcesModule.onTickModule();
+            } else {
+                LogIfChanged.log("Tick pvp", "Nada que recolectar");
+            }
+        } else if (!config.collectResourcesOnIdle && leaderIsNullOrOutOfMap()) {
+            LogIfChanged.log("Tick pvp", "Movimiento aleatorio");
+            movement.moveRandom();
+        } else {
+            LogIfChanged.log("Tick pvp", "Detenido");
+        }
+
+        var leader = followLeader.getLeader().orElse(null);
+        if (leader != null &&
+                movement.getDestination().distanceTo(leader) > config.distanceFromLeader) {
+            System.out.println("Cancelando movimiento lejos del líder");
+            movement.stop(true);
+        }
+    }
+
+    /**
+     * Verifica si el líder está ausente o fuera del mapa.
+     */
+    private boolean leaderIsNullOrOutOfMap() {
+        return followLeader.getLeader().orElse(null) == null &&
+                (!movement.isMoving() || movement.isOutOfMap());
+    }
+
+    /**
+     * Registra un mensaje de log y retorna desde el método.
+     *
+     * @param logCategory Categoría del log.
+     */
+    private void logAndExit(String logCategory) {
+        LogIfChanged.log(logCategory, getStatus());
+    }
+
+    /**
+     * Implementa la lógica de movimiento alrededor del objetivo.
+     *
+     * @param target El objetivo alrededor del cual moverse.
+     */
+    private void moveAround(Movable target) {
+        double distance = hero.getLocationInfo().distanceTo(target);
+        var targetLoc = target.getLocationInfo().destinationInTime(400);
+        if (distance > 600) {
+            if (movement.canMove(targetLoc)) {
+                movement.moveTo(targetLoc);
+                if (target.getSpeed() > hero.getSpeed())
+                    hero.setMode(ShipMode.of(configRun.getValue().getConfiguration(), hero.getFormation()));
+            }
+        } else {
+            hero.setMode(ShipMode.of(configOffensive.getValue().getConfiguration(), hero.getFormation()));
+            movement.moveTo(Location.of(targetLoc, (int) (Math.random() * 360), distance));
+        }
+    }
+
+    /**
+     * Lógica de cloaking automático.
+     */
     private void autoCloakLogic() {
         if (config.autoCloak.autoCloakShip && !hero.isInvisible() &&
                 System.nanoTime() - lastAttackTime > SECONDS.toNanos(config.autoCloak.secondsOfWaiting)) {
@@ -236,6 +342,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         }
     }
 
+    /**
+     * Lógica para recargar escudos.
+     */
     private void rechargeShields() {
         if (config.rechargeShields) {
             if (!isConfigAttackFull) {
@@ -253,21 +362,6 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
                     isConfigRunFull = true;
                 }
             }
-        }
-    }
-
-    private void moveAround(Movable target) {
-        double distance = hero.getLocationInfo().distanceTo(target);
-        var targetLoc = target.getLocationInfo().destinationInTime(400);
-        if (distance > 600) {
-            if (movement.canMove(targetLoc)) {
-                movement.moveTo(targetLoc);
-                if (target.getSpeed() > hero.getSpeed())
-                    hero.setMode(ShipMode.of(configRun.getValue().getConfiguration(), hero.getFormation()));
-            }
-        } else {
-            hero.setMode(ShipMode.of(configOffensive.getValue().getConfiguration(), hero.getFormation()));
-            movement.moveTo(Location.of(targetLoc, (int) (Math.random() * 360), distance));
         }
     }
 }
