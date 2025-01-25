@@ -24,6 +24,7 @@ import lol.same.pvptest.conditionalitems.ConditionsManagement;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -56,6 +57,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
     // Instancia de ConditionsManagement
     private final ConditionsManagement conditionsManagement;
 
+    // Instancia de WeaponSelector
+    private final WeaponSelector weaponSelector;
+
     private enum Status {
         IDLE,
         SAFETY_ESCAPING,
@@ -86,11 +90,14 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
 
         // Inicializar ConditionsManagement
         this.conditionsManagement = new ConditionsManagement(plugin.requireAPI(PluginAPI.class), heroItems);
+
+        // Inicializar WeaponSelector
+        this.weaponSelector = new WeaponSelector(plugin);
     }
 
     @Override
     public String getStatus() {
-        String msg = "Error";
+        String msg;
         switch (status) {
             case IDLE:
                 msg = (config.collectResourcesOnIdle)
@@ -111,6 +118,8 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
                         NANOSECONDS.toSeconds(System.nanoTime() - lastAttackTime)
                         + "/" + config.maxSecondsTimeOut;
                 break;
+            default:
+                msg = "Estado desconocido";
         }
         var leaderInfo = (followLeader.getLeaderId() == 0)
                 ? (followLeader.isSelfLeader() ? "Líder: Esta cuenta" : "Sin líder")
@@ -122,6 +131,24 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
     @Override
     public void setConfig(ConfigSetting<PvPConfig> newConfig) {
         this.config = newConfig.getValue();
+
+        // Actualizar WeaponSelector con las nuevas condiciones y configuraciones
+        if (config.enableIsh) {
+            weaponSelector.setIshCondition(config.ishCondition);
+        } else {
+            weaponSelector.setIshCondition(null); // Desactivar si no está habilitado
+        }
+
+        if (config.enablePem) {
+            weaponSelector.setPemCondition(config.pemCondition);
+            weaponSelector.setPemItem(config.pemItem);
+        } else {
+            weaponSelector.setPemCondition(null); // Desactivar si no está habilitado
+            weaponSelector.setPemItem(null);
+        }
+
+        // Pasar configuraciones de munición al WeaponSelector
+        weaponSelector.setAmmoConfig(config);
     }
 
     @Override
@@ -190,7 +217,7 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         targetSelect.invalidateCurrentIfNeeded(config, lastAttackTime, leader);
 
         if (!targetSelect.hasTarget() || config.followWhileAttacking) {
-            var result = followLeader.follow(config.distanceFromLeader);
+            var result = followLeader.follow((int) config.distanceFromLeader);
             LogIfChanged.log("Resultado de followLeader", result.name());
             if (result == FollowLeaderResult.GOING_TO_MAP)
                 status = Status.MAP_TRAVELING;
@@ -240,13 +267,17 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
             heroItems.useItem(SelectableItem.Cpu.CL04K);
         }
 
-        // Implementar uso de ISH-01
-        if (config.enableIsh) { // Verificar si ISH está habilitado
-            boolean ishUsed = conditionsManagement.useKeyWithConditions(config.ishCondition, SelectableItem.Special.ISH_01);
+        // Implementar uso de ISH-01 y PEM-01 a través de WeaponSelector
+        if (config.enableIsh || config.enablePem) { // Verificar si alguna munición está habilitada
+            boolean ishUsed = config.enableIsh && weaponSelector.useISH(System.currentTimeMillis());
+            boolean pemUsed = config.enablePem && !ishUsed && weaponSelector.usePEM(System.currentTimeMillis());
+
             if (ishUsed) {
                 LogIfChanged.log("Munición", "ISH-01 usado correctamente.");
+            } else if (pemUsed) {
+                LogIfChanged.log("Munición", "PEM-01 usado correctamente.");
             } else {
-                LogIfChanged.log("Munición", "No se pudo usar ISH-01.");
+                LogIfChanged.log("Munición", "No se pudo usar ninguna munición.");
             }
         }
 
@@ -347,18 +378,16 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
      */
     private void rechargeShields() {
         if (config.rechargeShields) {
+            double shieldPercent = hero.getHealth().shieldPercent();
+
             if (!isConfigAttackFull) {
                 hero.setMode(ShipMode.of(configOffensive.getValue().getConfiguration(), hero.getFormation()));
-                if ((hero.getHealth().getMaxShield() > 10000
-                        && hero.getHealth().shieldPercent() > 0.9)
-                        || hero.getHealth().getShield() >= hero.getHealth().getMaxShield()) {
+                if (shieldPercent > 0.9) {
                     isConfigAttackFull = true;
                 }
             } else if (!isConfigRunFull) {
                 hero.setMode(ShipMode.of(configRun.getValue().getConfiguration(), hero.getFormation()));
-                if ((hero.getHealth().getMaxShield() > 10000
-                        && hero.getHealth().shieldPercent() > 0.9)
-                        || hero.getHealth().getShield() >= hero.getHealth().getMaxShield()) {
+                if (shieldPercent > 0.9) {
                     isConfigRunFull = true;
                 }
             }

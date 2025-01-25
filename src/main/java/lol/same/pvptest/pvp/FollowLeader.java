@@ -105,7 +105,7 @@ public class FollowLeader {
             return FollowLeaderResult.GOING_TO_MAP;
         }
 
-        // 3) Si ya estamos en su mapa, desplazarnos a su ubicación de forma continua
+        // 3) Si ya estamos en su mapa, desplazarse a su ubicación de forma continua
         if (goToLocation(leaderLocation.location)) {
             return FollowLeaderResult.GOING_TO_LOCATION;
         }
