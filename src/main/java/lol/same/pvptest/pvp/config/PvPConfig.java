@@ -6,7 +6,6 @@ import eu.darkbot.api.config.annotations.Option;
 import eu.darkbot.api.config.annotations.Number;
 import eu.darkbot.api.config.types.Condition;
 import eu.darkbot.api.game.enums.EntityEffect;
-import eu.darkbot.api.game.items.SelectableItem;
 import lol.same.pvptest.conditionalitems.PercentHealthLessThanCondition;
 
 import java.util.HashSet;
@@ -14,54 +13,9 @@ import java.util.Set;
 
 @Configuration("pvp_module")
 public class PvPConfig {
-    // Opciones para Municiones Adicionales (Módulo 0)
-    @Option("general.enable_ucb100")
-    public boolean enableUCB100 = true;
 
-    @Option("general.enable_rsb75")
-    public boolean enableRSB75 = true;
-
-    @Option("general.enable_rcb140")
-    public boolean enableRCB140 = true;
-
-    @Option("general.enable_abl")
-    public boolean enableABL = true;
-
-    @Option("general.enable_pib")
-    public boolean enablePIB = true;
-
-    @Option("general.enable_rci3")
-    public boolean enableRCI3 = true;
-
-    @Option("general.enable_pld8")
-    public boolean enablePLD8 = true;
-
-    @Option("general.enable_npc_weapons")
-    public boolean enableNpcWeapons = true;
-
-    // Opción para habilitar ISH
-    @Option("general.enable_ish")
-    public boolean enableIsh = false;
-
-    // Condición para usar ISH-01
-    @Option("general.ish_condition")
-    public Condition ishCondition = new PercentHealthLessThanCondition(50); // Usar ISH si la salud < 50%
-
-    // Opción para habilitar PEM
-    @Option("general.enable_pem")
-    public boolean enablePem = false;
-
-    // Configuración para PEM-01
-    @Option("general.pem")
-    public SelectableItem.Special pemItem = SelectableItem.Special.EMP_01; // Usar el enum correcto
-
-    @Option("general.pem.desc")
-    public String pemDescription = "Condiciones PEM-01";
-
-    // Tiempo de espera entre usos (en segundos)
-    @Option("general.item_cooldown_seconds")
-    @Number(min = 0, max = 60, step = 1)
-    public int itemCooldownSeconds = 4; // 4 segundos de espera
+    @Option("pvp_module.ammo_config")
+    public AmmoConfig ammoConfig = new AmmoConfig();
 
     // Configuración de Auto Cloak
     @Option("auto_cloak")
@@ -69,7 +23,12 @@ public class PvPConfig {
 
     // Configuración del Efecto de Infección utilizando EntityEffect
     @Option("general.infection_effect")
-    public EntityEffect infectionEffect = EntityEffect.INFECTION; // Usar el enum existente
+    public EntityEffect infectionEffect = EntityEffect.INFECTION;
+
+    // Tiempo de espera entre usos (en segundos)
+    @Option("general.item_cooldown_seconds")
+    @Number(min = 0, max = 60, step = 1)
+    public int itemCooldownSeconds = 4; // 4 segundos de espera
 
     // Otras opciones relacionadas con auto camuflaje
     @Option("general.auto_cloak")
@@ -91,11 +50,16 @@ public class PvPConfig {
     @Option("pvp.distance_from_leader")
     public double distanceFromLeader = 500.0;
 
-    // Configuración de timeout
-    @Option("defense.max_time_out")
-    public long maxTimeOut = 60000; // en milisegundos, por ejemplo
-    // Opción para habilitar ISH
+    // Configuración de timeout en milisegundos
+    @Option("defense.max_time_out_ms")
+    public long maxTimeOut = 60000; // en milisegundos
 
+    // Configuración de timeout en segundos
+    @Option("defense.max_time_out_sec")
+    @Number(min = 0, max = 180, step = 1)
+    public int maxSecondsTimeOut = 10;
+
+    // Otras opciones relacionadas con seguimiento y copiado
     @Option("pvp.follow_while_attacking")
     public boolean followWhileAttacking = true;
 
@@ -127,10 +91,6 @@ public class PvPConfig {
     @Option("pvp_module.enable_collector")
     public boolean collectResourcesOnIdle = false;
 
-    @Option("defense.max_time_out")
-    @Number(min = 0, max = 180, step = 1)
-    public int maxSecondsTimeOut = 10;
-
     @Option("pvp_module.max_range_enemy_attacked")
     @Number(min = 200, max = 4000, step = 100)
     public int rangeForAttackedEnemy = 1000;
@@ -150,9 +110,4 @@ public class PvPConfig {
 
     @Option("general.ish.desc")
     public String ishDescription = "Condiciones ISH-01";
-
-    // Condición para usar PEM-01
-    @Option("general.pem_condition")
-    public Condition pemCondition = new PercentHealthLessThanCondition(50); // Usar PEM si la salud < 50%
-
 }

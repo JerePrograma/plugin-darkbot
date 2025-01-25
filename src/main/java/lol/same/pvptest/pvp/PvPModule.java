@@ -57,6 +57,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
     // Instancia de ConditionsManagement
     private final ConditionsManagement conditionsManagement;
 
+    // Instancia de AmmoSelect
+    private final AmmoSelect ammoSelect;
+
     // Instancia de WeaponSelector
     private final WeaponSelector weaponSelector;
 
@@ -71,6 +74,11 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
     @NotNull
     private Status status = Status.IDLE;
 
+    /**
+     * Constructor de PvPModule.
+     *
+     * @param plugin Instancia de PluginAPI proporcionada por DarkBot.
+     */
     public PvPModule(PluginAPI plugin) {
         this.hero = plugin.requireAPI(HeroAPI.class);
         this.heroItems = plugin.requireAPI(HeroItemsAPI.class);
@@ -89,12 +97,20 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         this.targetSelect = new TargetSelect(plugin);
 
         // Inicializar ConditionsManagement
-        this.conditionsManagement = new ConditionsManagement(plugin.requireAPI(PluginAPI.class), heroItems);
+        this.conditionsManagement = new ConditionsManagement(plugin, heroItems);
 
-        // Inicializar WeaponSelector
-        this.weaponSelector = new WeaponSelector(plugin);
+        // Inicializar AmmoSelect
+        this.ammoSelect = new AmmoSelect(plugin);
+
+        // Inicializar WeaponSelector con AmmoSelect
+        this.weaponSelector = new WeaponSelector(plugin, ammoSelect);
     }
 
+    /**
+     * Obtiene el estado actual del módulo PvP.
+     *
+     * @return Cadena que representa el estado actual.
+     */
     @Override
     public String getStatus() {
         String msg;
@@ -128,29 +144,27 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         return msg + " - " + leaderInfo;
     }
 
+    /**
+     * Establece la configuración del módulo PvP.
+     *
+     * @param newConfig Nueva configuración de PvP.
+     */
     @Override
     public void setConfig(ConfigSetting<PvPConfig> newConfig) {
         this.config = newConfig.getValue();
 
-        // Actualizar WeaponSelector con las nuevas condiciones y configuraciones
-        if (config.enableIsh) {
-            weaponSelector.setIshCondition(config.ishCondition);
-        } else {
-            weaponSelector.setIshCondition(null); // Desactivar si no está habilitado
-        }
+        // Pasar configuraciones de munición al AmmoSelect
+        ammoSelect.setConfig(config.ammoConfig);
 
-        if (config.enablePem) {
-            weaponSelector.setPemCondition(config.pemCondition);
-            weaponSelector.setPemItem(config.pemItem);
-        } else {
-            weaponSelector.setPemCondition(null); // Desactivar si no está habilitado
-            weaponSelector.setPemItem(null);
-        }
-
-        // Pasar configuraciones de munición al WeaponSelector
-        weaponSelector.setAmmoConfig(config);
+        // Pasar la configuración general al WeaponSelector si es necesario
+        weaponSelector.setConfig(config);
     }
 
+    /**
+     * Determina si el módulo puede ser refrescado.
+     *
+     * @return true si puede refrescarse, false en caso contrario.
+     */
     @Override
     public boolean canRefresh() {
         return !targetSelect.hasTarget() &&
@@ -158,6 +172,11 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
                 (config.ignoreSafety || safety.tick());
     }
 
+    /**
+     * Obtiene la configuración de sincronización.
+     *
+     * @return Objeto SyncerConfig con las configuraciones sincronizadas.
+     */
     @Override
     public SyncerConfig getSyncerConfig() {
         var syncerConfig = new SyncerConfig(followLeader.getLeaderId());
@@ -176,6 +195,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         return syncerConfig;
     }
 
+    /**
+     * Método llamado en cada tick del módulo PvP.
+     */
     @Override
     public void onTickModule() {
         updateStatus();
@@ -268,9 +290,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         }
 
         // Implementar uso de ISH-01 y PEM-01 a través de WeaponSelector
-        if (config.enableIsh || config.enablePem) { // Verificar si alguna munición está habilitada
-            boolean ishUsed = config.enableIsh && weaponSelector.useISH(System.currentTimeMillis());
-            boolean pemUsed = config.enablePem && !ishUsed && weaponSelector.usePEM(System.currentTimeMillis());
+        if (config.ammoConfig.enableIsh || config.ammoConfig.enablePem) { // Verificar si alguna munición está habilitada
+            boolean ishUsed = config.ammoConfig.enableIsh && weaponSelector.useISH(System.currentTimeMillis());
+            boolean pemUsed = config.ammoConfig.enablePem && !ishUsed && weaponSelector.usePEM(System.currentTimeMillis());
 
             if (ishUsed) {
                 LogIfChanged.log("Munición", "ISH-01 usado correctamente.");
@@ -325,6 +347,8 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
 
     /**
      * Verifica si el líder está ausente o fuera del mapa.
+     *
+     * @return true si el líder está ausente o fuera del mapa, false en caso contrario.
      */
     private boolean leaderIsNullOrOutOfMap() {
         return followLeader.getLeader().orElse(null) == null &&
