@@ -69,7 +69,7 @@ public class TargetSelect {
                 currentTarget = null;
             } else if (leader != null && leader.getTarget() == null && (
                     currentTargetReason == TargetSelectMode.HELP_ATTACK_PLAYERS ||
-                    currentTargetReason == TargetSelectMode.HELP_ATTACK_NPCS)) {
+                            currentTargetReason == TargetSelectMode.HELP_ATTACK_NPCS)) {
                 System.out.println("Dejando de atacar porque el líder dejo de atacar");
                 currentTarget = null;
             }
@@ -108,31 +108,31 @@ public class TargetSelect {
         }
         if (!hasTarget())
             players.stream()
-                .filter(p -> p.getEntityInfo().isEnemy() &&
-                        p.isAttacking() &&
-                        p.getTarget() != null &&
-                        (Syncer.talkedTo.contains(p.getTarget().getId()) || (
-                            group.hasGroup() && group.getMembers().stream().anyMatch(m -> m.getId() == p.getTarget().getId()))) &&
-                        (config.attackDisruptor || !p.getShipType().toLowerCase().contains("disruptor")) &&
-                        (!config.avoidDisruptorRedirect || !p.hasEffect(320)))
-                .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
-                .ifPresent(p -> trySetTargetWithReason(p, TargetSelectMode.DEFEND_GROUP_FROM_PLAYERS, modes));
+                    .filter(p -> p.getEntityInfo().isEnemy() &&
+                            p.isAttacking() &&
+                            p.getTarget() != null &&
+                            (Syncer.talkedTo.contains(p.getTarget().getId()) || (
+                                    group.hasGroup() && group.getMembers().stream().anyMatch(m -> m.getId() == p.getTarget().getId()))) &&
+                            (config.attackDisruptor || !p.getShipType().toLowerCase().contains("disruptor")) &&
+                            (!config.avoidDisruptorRedirect || !p.hasEffect(320)))
+                    .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
+                    .ifPresent(p -> trySetTargetWithReason(p, TargetSelectMode.DEFEND_GROUP_FROM_PLAYERS, modes));
         if (currentTarget != null)
             return prevTarget == null || prevTarget.getId() != currentTarget.getId();
         players.stream()
-            .filter(p -> p.getEntityInfo().isEnemy() &&
-                    p.isAttacking(hero) &&
-                    (config.attackDisruptor || !p.getShipType().toLowerCase().contains("disruptor")) &&
-                    (!config.avoidDisruptorRedirect || !p.hasEffect(320)) &&
-                    (!config.avoidCitadelDrawFire || !p.hasEffect(36)))
-            .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
-            .ifPresent(p -> trySetTargetWithReason(p, TargetSelectMode.DEFEND_SELF_FROM_PLAYERS, modes));
+                .filter(p -> p.getEntityInfo().isEnemy() &&
+                        p.isAttacking(hero) &&
+                        (config.attackDisruptor || !p.getShipType().toLowerCase().contains("disruptor")) &&
+                        (!config.avoidDisruptorRedirect || !p.hasEffect(320)) &&
+                        (!config.avoidCitadelDrawFire || !p.hasEffect(36)))
+                .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
+                .ifPresent(p -> trySetTargetWithReason(p, TargetSelectMode.DEFEND_SELF_FROM_PLAYERS, modes));
         if (hasTarget())
             return true;
         npcs.stream()
-            .filter(n -> n.getInfo().getShouldKill() && n.isAttacking(hero))
-            .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
-            .ifPresent(n -> trySetTargetWithReason(n, TargetSelectMode.DEFEND_SELF_FROM_NPCS, modes));
+                .filter(n -> n.getInfo().getShouldKill() && n.isAttacking(hero))
+                .min(Comparator.comparingDouble(s -> s.getLocationInfo().distanceTo(hero)))
+                .ifPresent(n -> trySetTargetWithReason(n, TargetSelectMode.DEFEND_SELF_FROM_NPCS, modes));
         if (hasTarget())
             return true;
         npcs.stream()
@@ -173,5 +173,13 @@ public class TargetSelect {
         }
 
         return playersToIgnore;
+    }
+
+    public Collection<? extends Player> getPlayers() {
+        return players;
+    }
+
+    public Collection<? extends Npc> getNpcs() {
+        return npcs;
     }
 }

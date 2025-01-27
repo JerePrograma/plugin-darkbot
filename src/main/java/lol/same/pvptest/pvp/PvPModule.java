@@ -62,6 +62,7 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
 
     // Instancia de WeaponSelector
     private final WeaponSelector weaponSelector;
+    private final AutoAttack autoAttack;
 
     private enum Status {
         IDLE,
@@ -104,6 +105,9 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
 
         // Inicializar WeaponSelector con AmmoSelect
         this.weaponSelector = new WeaponSelector(plugin, ammoSelect);
+
+        // Inicializar AutoAttack
+        this.autoAttack = new AutoAttack(plugin);
     }
 
     /**
@@ -155,9 +159,6 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
 
         // Pasar configuraciones de munición al AmmoSelect
         ammoSelect.setConfig(config.ammoConfig);
-
-        // Pasar la configuración general al WeaponSelector si es necesario
-        weaponSelector.setConfig(config);
     }
 
     /**
@@ -211,6 +212,8 @@ public class PvPModule implements Module, Configurable<PvPConfig>, SyncerConfigP
         handleCombat();
 
         handleIdleState();
+
+        autoAttack.onTickModule();
     }
 
     /**
